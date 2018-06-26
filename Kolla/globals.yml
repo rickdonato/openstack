@@ -1,3 +1,4 @@
+---
 # You can use this file to override _any_ variable throughout Kolla.
 # Additional options can be found in the
 # 'kolla-ansible/ansible/group_vars/all.yml' file. Default value of all the
@@ -101,6 +102,7 @@ neutron_external_interface: "ens224"
 # Valid options are [ openvswitch, linuxbridge, vmware_nsxv, vmware_dvs, opendaylight ]
 neutron_plugin_agent: "openvswitch"
 
+enable_neutron_provider_networks: "yes"
 
 ####################
 # keepalived options
@@ -336,7 +338,7 @@ neutron_plugin_agent: "openvswitch"
 #nova_backend_ceph: "{{ enable_ceph }}"
 
 # Valid options are [ qemu, kvm, vmware, xenapi ]
-#nova_compute_virt_type: "kvm"
+nova_compute_virt_type: "kvm"
 
 # The number of fake driver per compute node
 #num_nova_fake_per_node: 5
