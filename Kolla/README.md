@@ -3,7 +3,7 @@ The key components/settings that will be enabled are:
 
 ## Settings
 * KVM - config/nova.conf
- * virt_type = kvm
+ ** virt_type = kvm
  * cpu_mode = none
  * hw_machine_type = x86_64=pc-i440fx-rhel7.2.0
 * Neutron VLAN Net Range - config/neutron/ml2_conf.ini
