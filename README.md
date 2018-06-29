@@ -1,2 +1,3 @@
 # OpenStack
-Scripts and files for deploying OpenStack
+Scripts and files for deploying OpenStack.
+
