@@ -1,0 +1,12 @@
+packstack  -d  \
+          --install-hosts=172.29.236.180,172.29.236.181 \
+          --provision-demo=n \
+          --os-neutron-ml2-type-drivers=vxlan,vlan \
+          --os-neutron-ml2-tenant-network-types=vxlan    \
+          --os-neutron-ml2-vlan-ranges=physnet1:50:70    \
+          --os-neutron-ml2-vni-ranges=5000:6000               \
+          --os-neutron-ovs-bridge-mappings=physnet1:br-vlan   \
+          --os-neutron-l3-ext-bridge=provider              \
+          --os-neutron-ovs-bridge-interfaces=br-vlan:ens224    \
+          --os-neutron-ovs-bridges-compute=br-vlan \
+          --os-neutron-ovs-tunnel-if=ens192
