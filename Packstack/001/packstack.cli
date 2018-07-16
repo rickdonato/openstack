@@ -1,5 +1,5 @@
 packstack  -d  \
-          --install-hosts=172.29.236.180,172.29.236.181 \
+          --install-hosts=172.29.236.180,172.29.236.181,172.29.236.182 \
           --provision-demo=n \
           --os-neutron-ml2-type-drivers=vxlan,vlan \
           --os-neutron-ml2-tenant-network-types=vxlan    \
