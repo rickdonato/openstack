@@ -1,0 +1,16 @@
+/etc/sysconfig/network-scripts/ifcfg-ens192
+DEVICE=ens192
+NAME=ens192
+ONBOOT=yes
+BOOTPROTO=none
+IPADDR=172.29.236.181
+PREFIX=24
+GATEWAY=172.29.236.1
+
+/etc/sysconfig/network-scripts/ifcfg-ens224
+DEVICE=ens224
+NAME=ens224
+ONBOOT=yes
+BOOTPROTO=none
+IPADDR=192.168.80.181
+PREFIX=24
