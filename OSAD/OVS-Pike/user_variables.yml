@@ -200,3 +200,5 @@ neutron_provider_networks:
   network_types: "vlan"
   network_vlan_ranges: "physnet1:50:70"
   network_mappings: "physnet1:br-provider"
+  
+ keystone_ssl: false
