@@ -1,4 +1,4 @@
-openstack_service_publicuri_proto: http
+apply_security_hardening: false
 
 openstack_host_specific_kernel_modules:
   - name: "openvswitch"
@@ -6,11 +6,20 @@ openstack_host_specific_kernel_modules:
     group: "network_hosts"
 
 neutron_plugin_type: ml2.ovs
+neutron_ml2_drivers_type: "vxlan,vlan,local"
 
-neutron_ml2_drivers_type: "flat,vlan,vxlan"
+neutron_ml2_conf_ini_overrides:
+  securitygroup:
+    firewall_driver: openvswitch
+neutron_openvswitch_agent_ini_overrides:
+  securitygroup:
+    firewall_driver: openvswitch
 
 neutron_provider_networks:
   network_flat_networks: "*"
-  network_types: "vlan, vxlan"
-  network_vlan_ranges: "physnet1:50:70"
-  network_mappings: "physnet1:br-provider"
+  network_types: "vxlan,vlan"
+  network_vlan_ranges: "physnet1:2:4090"
+  network_mappings: "physnet1:br-vlan"
+  network_vxlan_ranges: "100001:999999"
+
+neutron_vxlan_enabled: true
