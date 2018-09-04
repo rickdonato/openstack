@@ -1,20 +1,13 @@
 #!/usr/bin/env bash
 
 # Variables
-VSD_IP=172.29.236.184
-KEYSTONE_PW=$(crudini --get /etc/nova/nova.conf keystone_authtoken password)
+#VSD_IP=172.29.236.184
+VSC1_IP=172.29.236.186
+VSC2_IP=
+OS_CONTROLLER_IP=172.29.236.180
+NOVA_OS_PW=56eb3244272e42f5
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
-
-# pw for vrs compute install script
-echo "Note: Keystone PW=${KEYSTONE_PW}"
-
-# check VSD user created
-echo -n "${BOLD}Ensure VSD user (cmsuser:cmsuser) is created. Continue (y/n)?${NORMAL}"
-read answer
-if [ "$answer" != "${answer#[Nn]}" ] ;then
-    exit 1
-fi
 
 echo "${BOLD}[*] Install crudini${NORMAL}"
 easy_install crudini
@@ -23,107 +16,56 @@ echo "${BOLD}[*] Disable SELinux${NORMAL}"
 sed -i 's/SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config
 setenforce 0
 
-echo "${BOLD}[*] Update/Disable Services${NORMAL}"
-systemctl stop neutron-dhcp-agent.service
-systemctl stop neutron-l3-agent.service
-systemctl stop neutron-metadata-agent.service
-systemctl stop neutron-openvswitch-agent.service
-systemctl stop neutron-netns-cleanup.service
-systemctl stop neutron-ovs-cleanup.service
-systemctl disable neutron-dhcp-agent.service
-systemctl disable neutron-l3-agent.service
-systemctl disable neutron-metadata-agent.service
-systemctl disable neutron-openvswitch-agent.service
-systemctl disable neutron-netns-cleanup.service
-systemctl disable neutron-ovs-cleanup.service
-systemctl stop neutron-server.service
+echo "${BOLD}[*] Install Deps${NORMAL}"
+rpm -iv http://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/v/vconfig-1.9-16.el7.x86_64.rpm
+yum install python-twisted-core perl-JSON libvirt qemu-kvm -y
 
-echo "${BOLD}[*] Install RPMs${NORMAL}"
-rpm -iv nuage-openstack-horizon-11.0.0-5.3.2_20_nuage.noarch.rpm
-rpm -iv nuage-openstack-neutron-10.0.0-5.3.2_20_nuage.noarch.rpm
-rpm -iv nuage-openstack-neutronclient-6.1.0-5.3.2_20_nuage.noarch.rpm
-rpm -iv nuage-nova-extensions-15.0.0-5.3.2_20_nuage.noarch.rpm
+echo "${BOLD}[*] Install VRS${NORMAL}"
+rpm -e --nodeps openvswitch-2.9.0-3.el7.x86_64
+yum localinstall nuage-openvswitch-5.3.2-28.el7.x86_64.rpm -y
+service openvswitch restart
+ovs-vsctl show
 
-echo "${BOLD}[*] Update OpenStack Neutron${NORMAL}"
-NEUTRON_CONF=/etc/neutron/neutron.conf
-crudini --set "${NEUTRON_CONF}" DEFAULT service_plugins "NuageL3, NuageAPI, NuagePortAttributes"
-crudini --set "${NEUTRON_CONF}" DEFAULT core_plugin "ml2"
-
-echo "${BOLD}[*] Update OpenStack ML2${NORMAL}"
-ML2_INI=/etc/neutron/plugins/ml2/ml2_conf.ini
-crudini --set "${ML2_INI}" ml2 mechanism_drivers nuage
-crudini --set "${ML2_INI}" ml2 extension_drivers "nuage_subnet, nuage_port, port_security"
-
-echo "${BOLD}[*] Configure Nuage Plugin${NORMAL}"
-mkdir -p /etc/neutron/plugins/nuage/
-rm -rf /etc/neutron/plugin.ini
-ln -s /etc/neutron/plugins/nuage/nuage_plugin.ini /etc/neutron/plugin.ini
-echo "
-[RESTPROXY]
-# Desired Name of VSD Organization/Enterprise to use when net-partition
-# is not specified
-default_net_partition_name = OpenStack_default
-# Hostname or IP address and port for connection to VSD server
-server = $VSD_IP:8443
-# VSD Username and password for OpenStack plugin connection
-# User must belong to CSP Root group and CSP CMS group
-serverauth = cmsuser:cmsuser
-nuage_fip_underlay = True
-### Do not change the below options for standard installs
-organization = csp
-auth_resource = /me
-serverssl = True
-base_uri = /nuage/api/v5_0
-cms_id =
-[PLUGIN]
-default_allow_non_ip = True" > /etc/neutron/plugins/nuage/nuage_plugin.ini
+echo "${BOLD}[*] Configure VRS${NORMAL}"
+OVS_CONF=/etc/default/openvswitch
+sed -i 's/PERSONALITY.*/PERSONALITY=vrs/g' $OVS_CONF
+sed -i "s/^.ACTIVE_CONTROLLER=.*/ACTIVE_CONTROLLER=${VSC1_IP}/g" $OVS_CONF
+sed -i "s/^.STANDBY_CONTROLLER=.*/STANDBY_CONTROLLER=${VSC2_IP}/g" $OVS_CONF
 
 echo "${BOLD}[*] Update OpenStack Nova${NORMAL}"
 NOVA_CONF=/etc/nova/nova.conf
-crudini --set "${NOVA_CONF}" DEFAULT firewall_driver nova.virt.firewall.NoopFirewallDriver
-crudini --set "${NOVA_CONF}" DEFAULT use_neutron True
+crudini --set "${NOVA_CONF}" DEFAULT Network_api_class nova.network.neutronv2.api.API
+crudini --set "${NOVA_CONF}" DEFAULT Libvirt_vif_driver nova.virt.libvirt.vif.LibvirtGenericVIFDriver
+crudini --set "${NOVA_CONF}" DEFAULT  Security_group_api neutron
+crudini --set "${NOVA_CONF}" DEFAULT Firewall_driver nova.virt.firewall.NoopFirewallDriver
 crudini --set "${NOVA_CONF}" neutron ovs_bridge alubr0
-crudini --set "${NOVA_CONF}" libvirt vif_driver nova.virt.libvirt.vif.LibvirtGenericVIFDriver
 
-echo "${BOLD}[*] Create CMD ID${NORMAL}"
-mkdir -p openstack-upgrade
-tar xzf nuage-openstack-upgrade-5.3.2-20.tar.gz -C openstack-upgrade/
-cd openstack-upgrade
-python generate_cms_id.py --config-file /etc/neutron/plugin.ini || exit 1
+echo "${BOLD}[*] Update OpenStack MetaAgent${NORMAL}"
+yum install python-novaclient python-httplib2 -y
+rpm -vi nuage-metadata-agent-*.x86_64.rpm
 
-echo "${BOLD}[*] Update OpenStack Horizon${NORMAL}"
-ALIAS_UPDATE='Alias /dashboard/static/nuage "/usr/lib/python2.7/site-packages/nuage_horizon/static"'
-sed -i "s|Alias declarations.*DocumentRoot|&\n  $ALIAS_UPDATE|g" /etc/httpd/conf.d/15-horizon_vhost.conf
+echo "
+METADATA_PORT=9697
+NOVA_METADATA_IP=${OS_CONTROLLER}
+NOVA_METADATA_PORT=8775
+METADATA_PROXY_SHARED_SECRET="NuageNetworksSharedSecret"
+NOVA_CLIENT_VERSION=2
+NOVA_OS_USERNAME=nova
+NOVA_OS_PASSWORD=${NOVA_OS_PW}
+NOVA_OS_TENANT_NAME=admin
+NOVA_OS_AUTH_URL=http://${OS_CONTROLLER}:5000/v3
+NUAGE_METADATA_AGENT_START_WITH_OVS=true
+#NOVA_REGION_NAME=regionOne
+NOVA_API_ENDPOINT_TYPE=publicURL
+NOVA_PROJECT_NAME=services
+NOVA_USER_DOMAIN_NAME=default
+NOVA_PROJECT_DOMAIN_NAME=default
+IDENTITY_URL_VERSION=3
+NOVA_OS_KEYSTONE_USERNAME=nova
+" > /etc/default/nuage-metadata-agent
 
-sed -i "s/HORIZON_CONFIG = {/&\n\    'customization_module\'\: \'nuage_horizon.customization\'\,/g" \
-    /usr/share/openstack-dashboard/openstack_dashboard/settings.py
+echo "${BOLD}[*] Configure Nuage Plugin${NORMAL}"
+service openstack-nova-compute restart || exit 1
 
-sed '/Directory>/r'<(
-echo "  <Directory \"/usr/lib/python2.7/site-packages/nuage_horizon\">"
-echo "   Options FollowSymLinks"
-echo "   AllowOverride None"
-echo "   Require all granted"
-echo "  </Directory>"
-)  -- /etc/httpd/conf.d/15-horizon_vhost.conf
-
-
-echo "${BOLD}[*] Update Neutron DB${NORMAL}"
-neutron-db-manage --config-file /etc/neutron/neutron.conf \
-                  --config-file /etc/neutron/plugins/nuage/nuage_plugin.ini \
-                  upgrade head
-
-echo "${BOLD}[*] Final Services Restart${NORMAL}"
-NEUTRON_SERVICE_SERVICE=/usr/lib/systemd/system/neutron-server.service
-crudini --set "${NEUTRON_SERVICE_SERVICE}" Service ExecStart "/usr/bin/neutron-server --config-file /usr/share/neutron/neutron-dist.conf --config-dir /usr/share/neutron/server --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugin.ini  --config-file /etc/neutron/plugins/ml2/ml2_conf.ini --config-dir /etc/neutron/conf.d/common --config-dir /etc/neutron/conf.d/neutron-server --log-file /var/log/neutron/server.log"
-set -v
-service openstack-nova-api restart || exit 1
-service openstack-nova-cert restart || exit 1
-service openstack-nova-consoleauth restart || exit 1
-service openstack-nova-scheduler  restart || exit 1
-service openstack-nova-conductor restart || exit 1
-service openstack-nova-novncproxy restart || exit 1
-service httpd restart || exit 1
-service neutron-server restart || exit 1
-set +v
 echo "${BOLD}[*] INSTALL COMPLETE${NORMAL}"
 exit 0
