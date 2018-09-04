@@ -2,8 +2,12 @@
 
 # Variables
 VSD_IP=172.29.236.184
+KEYSTONE_PW=$(crudini --get /etc/nova/nova.conf keystone_authtoken password)
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
+
+# pw for vrs compute install script
+echo "Note: Keystone PW=${KEYSTONE_PW}"
 
 # check VSD user created
 echo -n "${BOLD}Ensure VSD user (cmsuser:cmsuser) is created. Continue (y/n)?${NORMAL}"
@@ -88,16 +92,20 @@ cd openstack-upgrade
 python generate_cms_id.py --config-file /etc/neutron/plugin.ini || exit 1
 
 echo "${BOLD}[*] Update OpenStack Horizon${NORMAL}"
-DIR_UPDATE="<Directory /usr/lib/python2.7/site-packages/nuage_horizon>
- Options FollowSymLinks
- AllowOverride None
- Require all granted
-</Directory>"
-ALIAS_UPDATE=
+ALIAS_UPDATE='Alias /dashboard/static/nuage "/usr/lib/python2.7/site-packages/nuage_horizon/static"'
+sed -i "s|Alias declarations.*DocumentRoot|&\n  $ALIAS_UPDATE|g" /etc/httpd/conf.d/15-horizon_vhost.conf
 
 sed -i "s/HORIZON_CONFIG = {/&\n\    'customization_module\'\: \'nuage_horizon.customization\'\,/g" \
     /usr/share/openstack-dashboard/openstack_dashboard/settings.py
-sed -i "s|Alias declarations.*DocumentRoot|&\n  $ALIAS_UPDATE|g" /etc/httpd/conf.d/15-horizon_vhost.conf
+
+sed '/Directory>/r'<(
+echo "  <Directory \"/usr/lib/python2.7/site-packages/nuage_horizon\">"
+echo "   Options FollowSymLinks"
+echo "   AllowOverride None"
+echo "   Require all granted"
+echo "  </Directory>"
+)  -- /etc/httpd/conf.d/15-horizon_vhost.conf
+
 
 echo "${BOLD}[*] Update Neutron DB${NORMAL}"
 neutron-db-manage --config-file /etc/neutron/neutron.conf \
@@ -107,7 +115,7 @@ neutron-db-manage --config-file /etc/neutron/neutron.conf \
 echo "${BOLD}[*] Final Services Restart${NORMAL}"
 NEUTRON_SERVICE_SERVICE=/usr/lib/systemd/system/neutron-server.service
 crudini --set "${NEUTRON_SERVICE_SERVICE}" Service ExecStart "/usr/bin/neutron-server --config-file /usr/share/neutron/neutron-dist.conf --config-dir /usr/share/neutron/server --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugin.ini  --config-file /etc/neutron/plugins/ml2/ml2_conf.ini --config-dir /etc/neutron/conf.d/common --config-dir /etc/neutron/conf.d/neutron-server --log-file /var/log/neutron/server.log"
-set -x
+set -v
 service openstack-nova-api restart || exit 1
 service openstack-nova-cert restart || exit 1
 service openstack-nova-consoleauth restart || exit 1
@@ -116,6 +124,6 @@ service openstack-nova-conductor restart || exit 1
 service openstack-nova-novncproxy restart || exit 1
 service httpd restart || exit 1
 service neutron-server restart || exit 1
-
-echo "${BOLD}[*][SUCCESS] INSTALL COMPLETE${NORMAL}"
+set +v
+echo "${BOLD}[*] INSTALL COMPLETE${NORMAL}"
 exit 0
