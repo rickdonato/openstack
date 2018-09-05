@@ -23,20 +23,22 @@ echo "${BOLD}[*] Disable SELinux${NORMAL}"
 sed -i 's/SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config
 setenforce 0
 
-echo "${BOLD}[*] Update/Disable Services${NORMAL}"
+echo "${BOLD}[*] Stop Services${NORMAL}"
 systemctl stop neutron-dhcp-agent.service
 systemctl stop neutron-l3-agent.service
 systemctl stop neutron-metadata-agent.service
 systemctl stop neutron-openvswitch-agent.service
 systemctl stop neutron-netns-cleanup.service
 systemctl stop neutron-ovs-cleanup.service
+systemctl stop neutron-server.service
+
+echo "${BOLD}[*] Disable Services${NORMAL}"
 systemctl disable neutron-dhcp-agent.service
 systemctl disable neutron-l3-agent.service
 systemctl disable neutron-metadata-agent.service
 systemctl disable neutron-openvswitch-agent.service
 systemctl disable neutron-netns-cleanup.service
 systemctl disable neutron-ovs-cleanup.service
-systemctl stop neutron-server.service
 
 echo "${BOLD}[*] Install RPMs${NORMAL}"
 rpm -iv nuage-openstack-horizon-11.0.0-5.3.2_20_nuage.noarch.rpm
@@ -104,7 +106,7 @@ echo "   Options FollowSymLinks"
 echo "   AllowOverride None"
 echo "   Require all granted"
 echo "  </Directory>"
-)  -- /etc/httpd/conf.d/15-horizon_vhost.conf
+) -i -- /etc/httpd/conf.d/15-horizon_vhost.conf
 
 
 echo "${BOLD}[*] Update Neutron DB${NORMAL}"
