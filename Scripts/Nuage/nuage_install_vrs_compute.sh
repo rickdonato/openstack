@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 # Variables
-#VSD_IP=172.29.236.184
 VSC1_IP=172.29.236.186
 VSC2_IP=
 OS_CONTROLLER_IP=172.29.236.180
