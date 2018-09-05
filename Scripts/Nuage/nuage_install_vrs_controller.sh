@@ -96,7 +96,7 @@ ALIAS_UPDATE='Alias /dashboard/static/nuage "/usr/lib/python2.7/site-packages/nu
 sed -i "s|Alias declarations.*DocumentRoot|&\n  $ALIAS_UPDATE|g" /etc/httpd/conf.d/15-horizon_vhost.conf
 
 sed -i "s/HORIZON_CONFIG = {/&\n\    'customization_module\'\: \'nuage_horizon.customization\'\,/g" \
-    /usr/share/openstack-dashboard/openstack_dashboard/settings.py
+    /usr/share/openstack-dashboard/openstack_dashboard/local/local_settings.py
 
 sed '/Directory>/r'<(
 echo "  <Directory \"/usr/lib/python2.7/site-packages/nuage_horizon\">"
